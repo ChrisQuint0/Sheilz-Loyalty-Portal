@@ -3,6 +3,7 @@ export type Purchase = {
   drink: string
   date: string
   earnedStamp: boolean
+  isRewardRedeemed?: boolean
 }
 
 export type DashboardData = {
@@ -39,6 +40,13 @@ export const mockDashboard: DashboardData = {
     },
     {
       id: "p_2",
+      drink: "Free Pastry Reward",
+      date: "July 12",
+      earnedStamp: false,
+      isRewardRedeemed: true,
+    },
+    {
+      id: "p_21",
       drink: "Spanish Latte",
       date: "July 5",
       earnedStamp: true,

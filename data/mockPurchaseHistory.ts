@@ -1,24 +1,25 @@
 export type PurchaseItem = {
-  id: number
-  drink: string
-  purchaseDate: string
-  stampEarned: boolean
-  orderNumber?: string
-}
+  id: number;
+  drink: string;
+  purchaseDate: string;
+  stampEarned: boolean;
+  orderNumber?: string;
+  isRewardRedeemed?: boolean;
+};
 
 export type PurchaseSummary = {
-  totalPurchases: number
-  currentStamps: number
-  targetStamps: number
-  lastPurchaseDate: string
-}
+  totalPurchases: number;
+  currentStamps: number;
+  targetStamps: number;
+  lastPurchaseDate: string;
+};
 
 export const mockPurchaseSummary: PurchaseSummary = {
   totalPurchases: 43,
   currentStamps: 3,
   targetStamps: 10,
   lastPurchaseDate: "Yesterday",
-}
+};
 
 export const mockPurchaseHistory: PurchaseItem[] = [
   {
@@ -30,6 +31,13 @@ export const mockPurchaseHistory: PurchaseItem[] = [
   },
   {
     id: 2,
+    drink: "Free Pastry Reward",
+    purchaseDate: "July 12, 2026",
+    stampEarned: false,
+    isRewardRedeemed: true,
+  },
+  {
+    id: 21,
     drink: "Iced Spanish Latte",
     purchaseDate: "July 6, 2026",
     stampEarned: true,
@@ -41,10 +49,4 @@ export const mockPurchaseHistory: PurchaseItem[] = [
     stampEarned: true,
     orderNumber: "#8410",
   },
-  {
-    id: 4,
-    drink: "Americano",
-    purchaseDate: "June 28, 2026",
-    stampEarned: false,
-  },
-]
+];

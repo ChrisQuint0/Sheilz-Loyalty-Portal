@@ -10,8 +10,6 @@ import { registerSchema, RegisterInput } from "@/lib/validations/auth"
 import { FormField } from "./FormField"
 import { PasswordField } from "./PasswordField"
 import { Button } from "@/components/ui/button"
-import { Checkbox } from "@/components/ui/checkbox"
-import { Label } from "@/components/ui/label"
 
 export function RegisterForm() {
   const router = useRouter()
@@ -88,30 +86,6 @@ export function RegisterForm() {
           disabled={isLoading}
         />
 
-        <div className="flex items-center space-x-2 py-2">
-          <Checkbox 
-            id="termsAccepted" 
-            disabled={isLoading}
-            checked={methods.watch("termsAccepted")}
-            onCheckedChange={(checked) => methods.setValue("termsAccepted", checked as boolean, { shouldValidate: true })}
-          />
-          <div className="grid gap-1.5 leading-none">
-            <Label 
-              htmlFor="termsAccepted" 
-              className={`text-sm font-medium leading-none ${methods.formState.errors.termsAccepted ? "text-destructive" : ""}`}
-            >
-              Accept terms and conditions
-            </Label>
-            <p className="text-xs text-muted-foreground">
-              You agree to our Terms of Service and Privacy Policy.
-            </p>
-          </div>
-        </div>
-        {methods.formState.errors.termsAccepted && (
-          <p className="text-[0.8rem] font-medium text-destructive mt-1">
-            {methods.formState.errors.termsAccepted.message}
-          </p>
-        )}
 
         <Button type="submit" className="w-full mt-2" disabled={isLoading} size="lg">
           {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}

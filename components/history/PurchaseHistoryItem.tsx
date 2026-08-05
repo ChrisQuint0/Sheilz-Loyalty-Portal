@@ -14,24 +14,13 @@ export function PurchaseHistoryItem({ purchase }: PurchaseHistoryItemProps) {
           <Coffee className="h-5 w-5" />
         </div>
         
-        <div className="flex-1 min-w-0">
-          <div className="flex justify-between items-start gap-2">
-            <h3 className="font-semibold text-foreground truncate">{purchase.drink}</h3>
-            {purchase.orderNumber && (
-              <span className="text-xs font-medium text-muted-foreground bg-muted px-2 py-0.5 rounded-md shrink-0">
-                {purchase.orderNumber}
-              </span>
-            )}
-          </div>
-          
-          <div className="flex flex-col sm:flex-row sm:items-center gap-1 sm:gap-3 mt-1 text-xs text-muted-foreground">
-            <div className="flex items-center gap-1.5">
-              <Calendar className="h-3.5 w-3.5" />
-              <span>{purchase.purchaseDate}</span>
-            </div>
+        <div className="flex-1 min-w-0 flex flex-col justify-center">
+          <div className="flex items-center gap-2 mb-2">
+            <Calendar className="h-4 w-4 text-muted-foreground" />
+            <h3 className="font-semibold text-foreground">{purchase.purchaseDate}</h3>
           </div>
 
-          <PurchaseStatusBadge earned={purchase.stampEarned} />
+          <PurchaseStatusBadge earned={purchase.stampEarned} isRewardRedeemed={purchase.isRewardRedeemed} />
         </div>
       </div>
     </div>

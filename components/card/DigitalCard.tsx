@@ -1,4 +1,5 @@
-import { Coffee } from "lucide-react"
+import Image from "next/image"
+import sheilzLogo from "@/app/sheilz_logo.png"
 import { QRCodeSection } from "./QRCodeSection"
 
 interface DigitalCardProps {
@@ -19,7 +20,7 @@ export function DigitalCard({ customerName, cardNumber, memberSince, qrValue }: 
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <div className="flex items-center gap-2">
-            <Coffee className="h-6 w-6 text-white" />
+            <Image src={sheilzLogo} alt="Sheilz Logo" width={24} height={24} className="object-contain brightness-0 invert" />
             <span className="font-bold tracking-widest text-sm uppercase">Sheilz Coffee</span>
           </div>
           <span className="text-xs font-medium uppercase tracking-wider text-primary-foreground/80">Loyalty</span>
