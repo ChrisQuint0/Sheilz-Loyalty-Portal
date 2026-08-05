@@ -1,7 +1,8 @@
 import Link from "next/link"
 import { usePathname } from "next/navigation"
-import { LayoutDashboard, QrCode, User, Coffee, Clock } from "lucide-react"
+import { LayoutDashboard, QrCode, User, Clock } from "lucide-react"
 import { cn } from "@/lib/utils"
+import Image from "next/image"
 import { AvatarPlaceholder } from "../common/AvatarPlaceholder"
 
 const navItems = [
@@ -17,8 +18,8 @@ export function Sidebar() {
   return (
     <aside className="hidden w-64 flex-col border-r bg-sidebar lg:flex h-screen sticky top-0">
       <div className="flex h-16 items-center border-b px-6">
-        <Link href="/" className="flex items-center gap-2 font-semibold text-sidebar-foreground">
-          <Coffee className="h-6 w-6 text-primary" />
+        <Link href="/" className="flex items-center gap-3 font-semibold text-sidebar-foreground">
+          <Image src="/logo.png" alt="Sheilz Coffee" width={28} height={28} className="object-contain" />
           <span>Sheilz Loyalty</span>
         </Link>
       </div>
