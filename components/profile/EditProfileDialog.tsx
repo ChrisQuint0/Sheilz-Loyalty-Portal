@@ -29,7 +29,6 @@ export function EditProfileDialog({ profile, open, onOpenChange }: EditProfileDi
     defaultValues: {
       firstName: profile.firstName,
       lastName: profile.lastName,
-      phone: profile.phone,
     },
   })
 
@@ -55,8 +54,6 @@ export function EditProfileDialog({ profile, open, onOpenChange }: EditProfileDi
               <FormField name="firstName" label="First Name" />
               <FormField name="lastName" label="Last Name" />
             </div>
-            
-            <FormField name="phone" label="Phone Number" type="tel" />
             
             {/* Read only email visual */}
             <div className="space-y-2 opacity-70">
