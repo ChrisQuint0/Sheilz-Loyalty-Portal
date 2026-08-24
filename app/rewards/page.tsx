@@ -4,16 +4,19 @@ import { PageHeader } from "@/components/common/PageHeader";
 import { SectionCard } from "@/components/common/SectionCard";
 import { Button } from "@/components/ui/button";
 import { Coffee, Cookie } from "lucide-react";
+import { requireUser } from "@/lib/auth";
 
-export default function RewardsPage() {
+export default async function RewardsPage() {
+  await requireUser();
+
   return (
     <AppLayout>
       <PageContainer>
-        <PageHeader 
-          title="Rewards" 
-          description="Redeem your points for delicious treats." 
+        <PageHeader
+          title="Rewards"
+          description="Redeem your points for delicious treats."
         />
-        
+
         <div className="mb-6 px-4 py-3 bg-secondary text-secondary-foreground rounded-lg font-medium flex justify-between items-center">
           <span>Your Points Balance</span>
           <span className="text-xl font-bold">450</span>
@@ -26,7 +29,9 @@ export default function RewardsPage() {
                 <Coffee className="h-5 w-5 text-primary" />
               </div>
               <h3 className="font-semibold text-lg">Free Americano</h3>
-              <p className="text-sm text-muted-foreground mt-1">Get a free regular size Americano.</p>
+              <p className="text-sm text-muted-foreground mt-1">
+                Get a free regular size Americano.
+              </p>
             </div>
             <div className="mt-4 pt-4 border-t flex items-center justify-between">
               <span className="font-bold text-primary">300 pts</span>
@@ -40,11 +45,15 @@ export default function RewardsPage() {
                 <Cookie className="h-5 w-5 text-primary" />
               </div>
               <h3 className="font-semibold text-lg">Butter Croissant</h3>
-              <p className="text-sm text-muted-foreground mt-1">Freshly baked butter croissant.</p>
+              <p className="text-sm text-muted-foreground mt-1">
+                Freshly baked butter croissant.
+              </p>
             </div>
             <div className="mt-4 pt-4 border-t flex items-center justify-between">
               <span className="font-bold text-primary">500 pts</span>
-              <Button size="sm" variant="secondary" disabled>Need 50 pts</Button>
+              <Button size="sm" variant="secondary" disabled>
+                Need 50 pts
+              </Button>
             </div>
           </SectionCard>
         </div>

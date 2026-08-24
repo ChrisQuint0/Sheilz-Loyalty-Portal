@@ -1,7 +1,6 @@
-"use client"
+"use client";
 
-import { useRouter } from "next/navigation"
-import { toast } from "sonner"
+import * as React from "react";
 
 import {
   Dialog,
@@ -10,23 +9,25 @@ import {
   DialogTitle,
   DialogDescription,
   DialogFooter,
-} from "@/components/ui/dialog"
-import { Button } from "@/components/ui/button"
+} from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import { logoutAction } from "@/app/actions/auth";
 
 interface LogoutDialogProps {
-  open: boolean
-  onOpenChange: (open: boolean) => void
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
 }
 
 export function LogoutDialog({ open, onOpenChange }: LogoutDialogProps) {
-  const router = useRouter()
+  const [isPending, startTransition] = React.useTransition();
 
   const handleLogout = () => {
-    // Mock logout behavior
-    toast.success("Successfully logged out")
-    onOpenChange(false)
-    router.push("/login")
-  }
+    // logoutAction calls redirect("/login") — that throws NEXT_REDIRECT,
+    // which we intentionally let propagate.
+    startTransition(() => {
+      void logoutAction();
+    });
+  };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -34,19 +35,30 @@ export function LogoutDialog({ open, onOpenChange }: LogoutDialogProps) {
         <DialogHeader>
           <DialogTitle className="text-destructive">Logout?</DialogTitle>
           <DialogDescription>
-            Are you sure you want to log out of your account? You will need to sign back in to access your digital loyalty card.
+            Are you sure you want to log out of your account? You will need to
+            sign back in to access your digital loyalty card.
           </DialogDescription>
         </DialogHeader>
 
         <DialogFooter className="mt-6 pt-4 flex sm:justify-end gap-2">
-          <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => onOpenChange(false)}
+            disabled={isPending}
+          >
             Cancel
           </Button>
-          <Button type="button" variant="destructive" onClick={handleLogout}>
-            Logout
+          <Button
+            type="button"
+            variant="destructive"
+            onClick={handleLogout}
+            disabled={isPending}
+          >
+            {isPending ? "Signing out…" : "Logout"}
           </Button>
         </DialogFooter>
       </DialogContent>
     </Dialog>
-  )
+  );
 }

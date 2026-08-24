@@ -42,10 +42,6 @@ export function PersonalInformationCard({ profile }: PersonalInformationCardProp
           <span className="text-sm font-medium">{profile.email}</span>
         </div>
 
-        <div className="flex flex-col sm:flex-row sm:justify-between py-2 border-b last:border-0 gap-1">
-          <span className="text-sm text-muted-foreground">Phone Number</span>
-          <span className="text-sm font-medium">{profile.phone}</span>
-        </div>
       </div>
 
       <EditProfileDialog 
