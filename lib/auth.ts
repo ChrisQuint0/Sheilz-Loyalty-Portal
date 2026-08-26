@@ -69,14 +69,11 @@ export async function signOut() {
 // ----- Account provisioning -----
 
 function generateCardNumber(): string {
-  // 12-digit numeric card number, e.g. "4823 7156 9032"
-  const segments: string[] = []
-  for (let i = 0; i < 3; i += 1) {
-    segments.push(
-      Math.floor(1000 + Math.random() * 9000).toString(),
-    )
-  }
-  return segments.join(" ")
+  const dateStamp = new Date().toISOString().slice(0, 10).replace(/-/g, "")
+  const serial = Math.floor(100000000 + Math.random() * 900000000)
+    .toString()
+    .padStart(9, "0")
+  return `${dateStamp}-${serial}`
 }
 
 function generateQrToken(cardNumber: string): string {
@@ -95,29 +92,54 @@ function generateQrToken(cardNumber: string): string {
  */
 export async function provisionLoyaltyAccount(input: {
   userId: string
+  email: string
   firstName: string
   lastName: string
   phone?: string | null
 }): Promise<{ cardNumber: string; qrToken: string }> {
   const admin = createSupabaseAdminClient()
 
-  // 1. Customer profile (id matches auth user id).
-  const { error: profileError } = await admin.from("profiles").upsert(
+  // Store the customer name in Supabase auth metadata instead of assuming the
+  // project has a `profiles` table with `first_name`/`last_name` columns.
+  const { error: authMetadataError } = await admin.auth.admin.updateUserById(
+    input.userId,
     {
-      id: input.userId,
-      first_name: input.firstName,
-      last_name: input.lastName,
-      phone: input.phone ?? null,
+      user_metadata: {
+        first_name: input.firstName,
+        last_name: input.lastName,
+        phone: input.phone ?? null,
+        full_name: `${input.firstName} ${input.lastName}`.trim(),
+      },
     },
-    { onConflict: "id" },
   )
 
-  if (profileError) {
-    throw new Error(`Failed to create profile: ${profileError.message}`)
+  if (authMetadataError) {
+    throw new Error(`Failed to sync auth profile metadata: ${authMetadataError.message}`)
   }
 
-  // 2. Loyalty card.
+  // 2. Customer loyalty record used by the dashboard and POS flows.
   const cardNumber = generateCardNumber()
+  const now = new Date().toISOString()
+
+  const { error: customerError } = await admin.from("customers").upsert(
+    {
+      email_address: input.email.toLowerCase(),
+      loyalty_progress: 0,
+      membership_date: now,
+      card_status: true,
+      First_name: input.firstName,
+      last_name: input.lastName,
+      redeem_count: 0,
+      card_number: cardNumber,
+    },
+    { onConflict: "email_address" },
+  )
+
+  if (customerError) {
+    throw new Error(`Failed to create customer record: ${customerError.message}`)
+  }
+
+  // 3. Loyalty card.
   const qrToken = generateQrToken(cardNumber)
 
   const { error: cardError } = await admin.from("loyalty_cards").insert({
@@ -125,7 +147,7 @@ export async function provisionLoyaltyAccount(input: {
     card_number: cardNumber,
     qr_token: qrToken,
     status: "active",
-    member_since: new Date().toISOString(),
+    member_since: now,
     stamps: 0,
     target_stamps: 10,
   })

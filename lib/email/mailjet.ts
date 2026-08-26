@@ -14,9 +14,14 @@ interface SendEmailParams {
   text?: string;
 }
 
+// Bound the Mailjet call so a slow / hanging upstream can never block a
+// Server Action for tens of seconds (which manifests to the user as a 504).
+// 8s is well above Mailjet's normal p99 but short enough to fail fast.
+const MAILJET_TIMEOUT_MS = 8_000;
+
 export async function sendEmail({ to, subject, html, text }: SendEmailParams) {
   try {
-    const result = await client
+    const requestPromise = client
       .post('send', { version: 'v3.1' })
       .request({
         Messages: [
@@ -36,11 +41,21 @@ export async function sendEmail({ to, subject, html, text }: SendEmailParams) {
           },
         ],
       });
-    
-    return { success: true, data: result.body };
+
+    const result = await Promise.race([
+      requestPromise,
+      new Promise<never>((_, reject) =>
+        setTimeout(
+          () => reject(new Error(`Mailjet request timed out after ${MAILJET_TIMEOUT_MS}ms`)),
+          MAILJET_TIMEOUT_MS,
+        ),
+      ),
+    ]);
+
+    return { success: true as const, data: result.body };
   } catch (error) {
     console.error('Mailjet send error:', error);
-    return { success: false, error };
+    return { success: false as const, error };
   }
 }
 
