@@ -6,8 +6,6 @@ import { z } from "zod"
 
 import { createSupabaseServerClient } from "@/lib/supabase/server"
 import { provisionLoyaltyAccount } from "@/lib/auth"
-import { sendEmail, generateVerificationEmail, generatePasswordResetEmail } from "@/lib/email/mailjet"
-import { generateVerificationLink } from "@/lib/auth/verification"
 
 const loginSchema = z.object({
   email: z.string().email("Please enter a valid email address."),
@@ -136,19 +134,31 @@ export async function registerAction(
 
   const { firstName, lastName, email, phone, password } = parsed.data
   const supabase = await createSupabaseServerClient()
+  const origin = await getOrigin()
 
-  // Create the user with email confirmation disabled (we'll handle it manually)
+  // Temporary debug log: capture the computed origin and the email redirect
+  // destination so we can confirm the exact URL supplied to Supabase.
+  try {
+    console.log('[auth] registerAction: origin=', origin)
+    console.log('[auth] registerAction: emailRedirectTo=', `${origin}/auth/callback?next=/dashboard`)
+  } catch {
+    // swallow logging errors — don't interrupt the flow
+  }
+
+  // Supabase handles the confirmation email itself (via the SMTP provider
+  // configured in the Supabase dashboard — Mailjet in this project). When the
+  // user clicks the link in the email, Supabase redirects back here:
+  //   /auth/callback?code=...&next=/dashboard
+  // which exchanges the code for a session and forwards the user.
   const { data, error } = await supabase.auth.signUp({
     email,
     password,
     options: {
-      // Don't auto-send email confirmation
-      emailRedirectTo: undefined,
+      emailRedirectTo: `${origin}/auth/callback?next=${encodeURIComponent("/profile")}`,
       data: {
         first_name: firstName,
         last_name: lastName,
         phone: phone || null,
-        email_confirmed: false,
       },
     },
   })
@@ -167,48 +177,29 @@ export async function registerAction(
     }
   }
 
-  // Generate and send verification email via Mailjet
+  // Auto-provision profile + loyalty card. We do this before redirecting so
+  // the user lands in the dashboard with a real card already on file.
   try {
-    const origin = await getOrigin()
-    const verificationLink = await generateVerificationLink({
+    await provisionLoyaltyAccount({
+      userId: data.user.id,
       email,
-      type: 'signup',
-      origin,
-      password,
+      firstName,
+      lastName,
+      phone: phone || null,
     })
-
-    if (verificationLink) {
-      const emailContent = generateVerificationEmail(verificationLink)
-      await sendEmail({
-        to: email,
-        subject: emailContent.subject,
-        html: emailContent.html,
-        text: emailContent.text,
-      })
-    }
-
-    // Auto-provision profile + loyalty card
-    try {
-      await provisionLoyaltyAccount({
-        userId: data.user.id,
-        firstName,
-        lastName,
-        phone: phone || null,
-      })
-    } catch (err) {
-      console.error("Loyalty account provisioning failed:", err)
-    }
-
-    // Redirect back to login with a success query so the UI can show the
-    // email verification instruction without hitting a non-existent /auth route.
-    redirect(`/login?email=${encodeURIComponent(email)}&verification=sent`)
   } catch (err) {
-    console.error("Failed to send verification email:", err)
-    return {
-      ok: false,
-      message: "Account created but we couldn't send the verification email. Please try resending it.",
-    }
+    console.error("Loyalty account provisioning failed:", err)
   }
+
+  // If Supabase already has an active session (e.g. email confirmation is
+  // disabled in the dashboard), head straight to the dashboard. Otherwise
+  // bounce the user to the login screen with a hint that a confirmation
+  // email is on the way.
+  if (data.session) {
+    redirect("/dashboard")
+  }
+
+  redirect(`/login?email=${encodeURIComponent(email)}&verification=sent`)
 }
 
 // ---------- Forgot password ----------
@@ -229,74 +220,227 @@ export async function forgotPasswordAction(
     }
   }
 
+  const { email } = parsed.data
   const supabase = await createSupabaseServerClient()
-  const email = parsed.data.email
+  const origin = await getOrigin()
 
+  // Temporary debug log: capture the computed origin, next URL and the
+  // callback URL supplied to Supabase for the reset email.
   try {
-    const origin = await getOrigin()
-    const resetLink = await generateVerificationLink({
-      email,
-      type: 'reset',
-      origin,
+    const nextUrl = `${origin}/login?recovery=1`
+    const callbackUrl = `${origin}/auth/callback?type=recovery&next=${encodeURIComponent(nextUrl)}`
+    console.log('[auth] forgotPasswordAction: origin=', origin)
+    console.log('[auth] forgotPasswordAction: nextUrl=', nextUrl)
+    console.log('[auth] forgotPasswordAction: callbackUrl=', callbackUrl)
+
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: callbackUrl,
     })
 
-    if (resetLink) {
-      const emailContent = generatePasswordResetEmail(resetLink)
-      await sendEmail({
-        to: email,
-        subject: emailContent.subject,
-        html: emailContent.html,
-        text: emailContent.text,
-      })
+    if (error) {
+      console.error("Failed to send reset email:", error)
+      return {
+        ok: false,
+        message: "We couldn't send the reset email. Please try again.",
+      }
     }
 
     return {
       ok: true,
       message: "If that email is registered, a reset link is on its way.",
     }
-  } catch (error) {
-    console.error("Failed to send reset email:", error)
-    return {
-      ok: false,
-      message: "We couldn't send the reset email. Please try again.",
-    }
-  }
-}
-
-// ---------- Resend verification ----------
-
-export async function resendVerificationAction(
-  email: string
-): Promise<ActionResult> {
-  const supabase = await createSupabaseServerClient()
-  const origin = await getOrigin()
-
-  try {
-    const { error } = await supabase.auth.resend({
-      type: "signup",
-      email,
-      options: {
-        emailRedirectTo: `${origin}/login`,
-      },
+  } catch (e) {
+    console.error('[auth] forgotPasswordAction: logging/callback build failed', e)
+    // Fallback: attempt to call reset without the debug wrapper.
+    const nextUrl = `${origin}/login?recovery=1`
+    const callbackUrl = `${origin}/auth/callback?type=recovery&next=${encodeURIComponent(nextUrl)}`
+    const { error } = await supabase.auth.resetPasswordForEmail(email, {
+      redirectTo: callbackUrl,
     })
 
     if (error) {
+      console.error("Failed to send reset email:", error)
       return {
         ok: false,
-        message: error.message || "Failed to resend verification email.",
+        message: "We couldn't send the reset email. Please try again.",
       }
     }
 
     return {
       ok: true,
-      message: "Verification email sent successfully.",
+      message: "If that email is registered, a reset link is on its way.",
     }
-  } catch (error) {
-    console.error("Failed to resend verification email:", error)
+  }
+}
+
+// ---------- Update password (recovery) ----------
+
+export async function updatePasswordAction(
+  _prev: ActionResult | undefined,
+  formData: FormData,
+): Promise<ActionResult> {
+  const zPassword = z
+    .object({
+      password: z.string().min(8, "Password must be at least 8 characters."),
+      confirmPassword: z.string().min(1, "Please confirm your password."),
+    })
+    .refine((data) => data.password === data.confirmPassword, {
+      path: ["confirmPassword"],
+      message: "Passwords do not match.",
+    })
+
+  const parsed = zPassword.safeParse({
+    password: formData.get("password"),
+    confirmPassword: formData.get("confirmPassword"),
+  })
+
+  if (!parsed.success) {
     return {
       ok: false,
-      message: "Failed to resend verification email.",
+      message: "Please fix the highlighted fields.",
+      fieldErrors: flattenZodErrors(parsed.error),
     }
+  }
+
+  const { password } = parsed.data
+  const supabase = await createSupabaseServerClient()
+
+  // The recovery session created by the callback route allows this call to
+  // set the new password for the user. On success, send them to login.
+  const { error } = await supabase.auth.updateUser({ password })
+
+  if (error) {
+    console.error("Failed to update password:", error)
+    return {
+      ok: false,
+      message: error.message ?? "Failed to update password. Please try again.",
+    }
+  }
+
+  return {
+    ok: true,
+    message: "Password updated successfully.",
+  }
+}
+
+export async function updateProfileAction(
+  _prev: ActionResult | undefined,
+  formData: FormData,
+): Promise<ActionResult> {
+  const profileSchema = z.object({
+    firstName: z.string().min(1, "First name is required."),
+    lastName: z.string().min(1, "Last name is required."),
+  })
+
+  const parsed = profileSchema.safeParse({
+    firstName: formData.get("firstName"),
+    lastName: formData.get("lastName"),
+  })
+
+  if (!parsed.success) {
+    return {
+      ok: false,
+      message: "Please fix the highlighted fields.",
+      fieldErrors: flattenZodErrors(parsed.error),
+    }
+  }
+
+  const { firstName, lastName } = parsed.data
+  const supabase = await createSupabaseServerClient()
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser()
+
+  if (userError || !user) {
+    return {
+      ok: false,
+      message: "Your session expired. Please sign in again.",
+    }
+  }
+
+  const email = user.email?.toLowerCase()
+  if (!email) {
+    return {
+      ok: false,
+      message: "We could not determine your email address.",
+    }
+  }
+
+  const { error: authProfileError } = await supabase.auth.updateUser({
+    data: {
+      first_name: firstName,
+      last_name: lastName,
+      full_name: `${firstName} ${lastName}`.trim(),
+    },
+  })
+
+  if (authProfileError) {
+    console.error("Failed to update auth profile metadata:", authProfileError)
+    return {
+      ok: false,
+      message: "We couldn't update your profile. Please try again.",
+    }
+  }
+
+  const { error: customerError } = await supabase
+    .from("customers")
+    .upsert(
+      {
+        email_address: email,
+        First_name: firstName,
+        last_name: lastName,
+      },
+      { onConflict: "email_address" },
+    )
+
+  if (customerError) {
+    console.error("Failed to update customer record:", customerError)
+    return {
+      ok: false,
+      message: "We couldn't update your profile. Please try again.",
+    }
+  }
+
+  return {
+    ok: true,
+    message: "Profile updated successfully.",
+  }
+}
+
+export async function requestPasswordResetAction(): Promise<ActionResult> {
+  const supabase = await createSupabaseServerClient()
+  const {
+    data: { user },
+    error: userError,
+  } = await supabase.auth.getUser()
+
+  if (userError || !user?.email) {
+    return {
+      ok: false,
+      message: "Your session expired. Please sign in again.",
+    }
+  }
+
+  const origin = await getOrigin()
+  const nextUrl = `${origin}/login?recovery=1`
+  const callbackUrl = `${origin}/auth/callback?type=recovery&next=${encodeURIComponent(nextUrl)}`
+
+  const { error } = await supabase.auth.resetPasswordForEmail(user.email, {
+    redirectTo: callbackUrl,
+  })
+
+  if (error) {
+    console.error("Failed to send password reset email:", error)
+    return {
+      ok: false,
+      message: "We couldn't send the password reset email. Please try again.",
+    }
+  }
+
+  return {
+    ok: true,
+    message: "Password reset email sent. Check your inbox for the secure link.",
   }
 }
 
