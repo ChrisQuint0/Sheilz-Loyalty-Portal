@@ -51,6 +51,12 @@ function flattenZodErrors(error: z.ZodError): Record<string, string[]> {
 }
 
 async function getOrigin(): Promise<string> {
+  if (process.env.NEXT_PUBLIC_SITE_URL) {
+    return process.env.NEXT_PUBLIC_SITE_URL
+  }
+  if (process.env.VERCEL_URL) {
+    return `https://${process.env.VERCEL_URL}`
+  }
   const h = await headers()
   const host = h.get("x-forwarded-host") ?? h.get("host")
   const proto = h.get("x-forwarded-proto") ?? "http"
@@ -154,7 +160,7 @@ export async function registerAction(
     email,
     password,
     options: {
-      emailRedirectTo: `${origin}/auth/callback?next=${encodeURIComponent("/profile")}`,
+      emailRedirectTo: `${origin}/auth/callback?next=${encodeURIComponent("/login")}`,
       data: {
         first_name: firstName,
         last_name: lastName,
