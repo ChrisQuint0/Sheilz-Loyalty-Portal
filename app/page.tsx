@@ -23,7 +23,7 @@ export default function LandingPage() {
           </h1>
           <p className="text-lg md:text-xl opacity-90 mb-8 max-w-xl mx-auto">
             Free 12oz Sparkling green apple upon sign-up. Earn a stamp for every
-            Sheilz Coffee Purchase. Collectt 9 stamps, and your next drink is on
+            Sheilz Coffee Purchase. Collect 9 stamps, and your next drink is on
             us. Your digital punch card, right in your pocket.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 w-full sm:w-auto">
