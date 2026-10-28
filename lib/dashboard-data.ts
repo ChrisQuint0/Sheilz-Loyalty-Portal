@@ -34,6 +34,11 @@ type LoyaltyEvent = {
   created_at?: string | null;
 };
 
+type DashboardCustomer = {
+  loyalty_log_count?: Array<{ count: number | null }>;
+  recent_purchases?: LoyaltyEvent[];
+};
+
 export async function getDashboardData(email: string | null): Promise<DashboardSnapshot> {
   const supabase = await createSupabaseServerClient();
 
@@ -49,55 +54,55 @@ export async function getDashboardData(email: string | null): Promise<DashboardS
         membership_date,
         card_status,
         card_number,
-        loyalty_log (
+        recent_purchases:loyalty_log (
           id,
           event_type,
           description,
           points_change,
           created_at
-        )
+        ),
+        loyalty_log_count:loyalty_log (count)
       `,
     )
     .eq("email_address", email ?? "")
+    .order("created_at", {
+      ascending: false,
+      nullsFirst: false,
+      referencedTable: "recent_purchases",
+    })
+    .limit(4, { referencedTable: "recent_purchases" })
     .maybeSingle();
 
   if (error) {
     throw new Error(`Failed to load dashboard: ${error.message}`);
   }
 
-  const customerRecord = customer as { loyalty_log?: LoyaltyEvent[] } | null;
-  const loyaltyEvents = Array.isArray(customerRecord?.loyalty_log)
-    ? customerRecord.loyalty_log ?? []
+  const customerRecord = customer as DashboardCustomer | null;
+  const recentEvents = Array.isArray(customerRecord?.recent_purchases)
+    ? customerRecord.recent_purchases
     : [];
+  const loyaltyLogCount = customerRecord?.loyalty_log_count?.[0]?.count ?? 0;
 
-  const recentPurchases = loyaltyEvents
-    .slice()
-    .sort((a, b) => {
-      const aTime = a.created_at ? new Date(a.created_at).getTime() : 0;
-      const bTime = b.created_at ? new Date(b.created_at).getTime() : 0;
-      return bTime - aTime;
-    })
-    .slice(0, 4)
-    .map((event) => {
-      const eventType = event.event_type ?? "Loyalty Event";
-      const description = event.description ?? eventType;
-      const earnedStamp = Number(event.points_change ?? 0) > 0;
-      const isRewardRedeemed =
-        /redeem|reward/i.test(eventType) || /redeem|reward/i.test(description);
+  const recentPurchases = recentEvents.map((event) => {
+    const eventType = event.event_type ?? "Loyalty Event";
+    const description = event.description ?? eventType;
+    const earnedStamp = Number(event.points_change ?? 0) > 0;
+    const isRewardRedeemed =
+      /redeem|reward/i.test(eventType) || /redeem|reward/i.test(description);
 
-      return {
-        id: event.id,
-        drink: description,
-        date: event.created_at
-          ? new Intl.DateTimeFormat("en-US", {
-              month: "short",
-              day: "numeric",
-            }).format(new Date(event.created_at))
-          : "Recent",
-        earnedStamp,
-        isRewardRedeemed: isRewardRedeemed && !earnedStamp,
-      };
-    });
+    return {
+      id: event.id,
+      drink: description,
+      date: event.created_at
+        ? new Intl.DateTimeFormat("en-US", {
+            month: "short",
+            day: "numeric",
+          }).format(new Date(event.created_at))
+        : "Recent",
+      earnedStamp,
+      isRewardRedeemed: isRewardRedeemed && !earnedStamp,
+    };
+  });
 
   const currentStamps = Number(customer?.loyalty_progress ?? 0);
   const targetStamps = 10;
@@ -127,7 +132,7 @@ export async function getDashboardData(email: string | null): Promise<DashboardS
       memberSince,
       qrValue: cardNumber.replace(/\s+/g, ""),
       status: customer?.card_status === false ? "Inactive" : "Active",
-      totalPurchases: loyaltyEvents.length,
+      totalPurchases: loyaltyLogCount,
     },
     recentPurchases,
   };
